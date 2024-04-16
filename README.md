@@ -80,84 +80,84 @@ Note that currently the chat history is not linked to any user. Hence, when mult
 
   Here, we are creating the index `docs-search` on the documents in the `_default` collection within the `_default` scope in the bucket `docs`. The Vector field is set to `embeddings` with 1536 dimensions and the text field set to `text`. We are also indexing and storing all the fields under `metadata` in the document as a dynamic mapping to account for varying document structures. The similarity metric is set to `dot_product`. If there is a change in these parameters, please adapt the index accordingly.
 
-  ```
+  ```json
   {
-  "type": "fulltext-index",
-  "name": "docs._default.docs-search",
-  "uuid": "2aefca04031a299d",
-  "sourceType": "gocbcore",
-  "sourceName": "docs",
-  "planParams": {
-    "maxPartitionsPerPIndex": 1024,
-    "indexPartitions": 1
-  },
-  "params": {
-    "doc_config": {
-      "docid_prefix_delim": "",
-      "docid_regexp": "",
-      "mode": "scope.collection.type_field",
-      "type_field": "type"
+    "type": "fulltext-index",
+    "name": "docs._default.docs-search",
+    "uuid": "2aefca04031a299d",
+    "sourceType": "gocbcore",
+    "sourceName": "docs",
+    "planParams": {
+      "maxPartitionsPerPIndex": 1024,
+      "indexPartitions": 1
     },
-    "mapping": {
-      "analysis": {},
-      "default_analyzer": "standard",
-      "default_datetime_parser": "dateTimeOptional",
-      "default_field": "_all",
-      "default_mapping": {
-        "dynamic": false,
-        "enabled": false
+    "params": {
+      "doc_config": {
+        "docid_prefix_delim": "",
+        "docid_regexp": "",
+        "mode": "scope.collection.type_field",
+        "type_field": "type"
       },
-      "default_type": "_default",
-      "docvalues_dynamic": false,
-      "index_dynamic": true,
-      "store_dynamic": true,
-      "type_field": "_type",
-      "types": {
-        "_default._default": {
+      "mapping": {
+        "analysis": {},
+        "default_analyzer": "standard",
+        "default_datetime_parser": "dateTimeOptional",
+        "default_field": "_all",
+        "default_mapping": {
           "dynamic": false,
-          "enabled": true,
-          "properties": {
-            "embedding": {
-              "dynamic": false,
-              "enabled": true,
-              "fields": [
-                {
-                  "dims": 1536,
-                  "index": true,
-                  "name": "embedding",
-                  "similarity": "dot_product",
-                  "type": "vector",
-                  "vector_index_optimized_for": "recall"
-                }
-              ]
-            },
-            "metadata": {
-              "dynamic": true,
-              "enabled": true
-            },
-            "text": {
-              "dynamic": false,
-              "enabled": true,
-              "fields": [
-                {
-                  "analyzer": "en",
-                  "index": true,
-                  "name": "text",
-                  "store": true,
-                  "type": "text"
-                }
-              ]
+          "enabled": false
+        },
+        "default_type": "_default",
+        "docvalues_dynamic": false,
+        "index_dynamic": true,
+        "store_dynamic": true,
+        "type_field": "_type",
+        "types": {
+          "_default._default": {
+            "dynamic": false,
+            "enabled": true,
+            "properties": {
+              "embedding": {
+                "dynamic": false,
+                "enabled": true,
+                "fields": [
+                  {
+                    "dims": 1536,
+                    "index": true,
+                    "name": "embedding",
+                    "similarity": "dot_product",
+                    "type": "vector",
+                    "vector_index_optimized_for": "recall"
+                  }
+                ]
+              },
+              "metadata": {
+                "dynamic": true,
+                "enabled": true
+              },
+              "text": {
+                "dynamic": false,
+                "enabled": true,
+                "fields": [
+                  {
+                    "analyzer": "en",
+                    "index": true,
+                    "name": "text",
+                    "store": true,
+                    "type": "text"
+                  }
+                ]
+              }
             }
           }
         }
+      },
+      "store": {
+        "indexType": "scorch",
+        "segmentVersion": 16
       }
     },
-    "store": {
-      "indexType": "scorch",
-      "segmentVersion": 16
-    }
-  },
-  "sourceParams": {}
+    "sourceParams": {}
   }
   ```
 
