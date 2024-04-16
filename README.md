@@ -43,7 +43,7 @@ Note that currently the chat history is not linked to any user. Hence, when mult
 
   We need to index the documents that the Q&A ChatBot can answer. For this, there in an ingestion script, `ingest_docs.py` that can be used to ingest the documents into Couchbase Vector Store.
 
-  For the list of documents, you can use the template `files_with_urls.json.example`. You can copy the file into `files_with_urls.json` and add your list of URLs to support.
+  For the list of documents, you can use the template `file_with_urls.json.example`. You can copy the file into `file_with_urls.json` and add your list of URLs to support.
 
   The file has the format of one URL per line of the document like the following:
 

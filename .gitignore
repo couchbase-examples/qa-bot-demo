@@ -160,4 +160,4 @@ cython_debug/
 #.idea/
 
 # Documents for ingestion
-files_with_urls.json
+file_with_urls.json
