@@ -139,7 +139,7 @@ if __name__ == "__main__":
         check_environment_variable("LANGCHAIN_API_KEY")
 
         # Setup Langsmith Client
-        os.environ.setdefault("LANGCHAIN_TRACING_V2", True)
+        os.environ.setdefault("LANGCHAIN_TRACING_V2", "True")
         client = Client()
 
         cluster = connect_to_couchbase(DB_CONN_STR, DB_USERNAME, DB_PASSWORD)
