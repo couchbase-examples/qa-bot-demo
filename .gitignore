@@ -161,3 +161,6 @@ cython_debug/
 
 # Documents for ingestion
 file_with_urls.json
+
+# Streamlit secrets
+secrets.toml

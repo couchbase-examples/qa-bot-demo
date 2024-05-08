@@ -14,13 +14,16 @@ from langchain_core.runnables import (
     RunnableBranch,
 )
 from langchain_core.output_parsers import StrOutputParser
-from dotenv import load_dotenv
 from langchain.memory import ChatMessageHistory
-
 from langchain.chains.combine_documents import create_stuff_documents_chain
 
 import streamlit as st
 import os
+
+
+def parse_bool(value: str):
+    """Parse boolean values from environment variables"""
+    return value.lower() in ("yes", "true", "t", "1")
 
 
 def check_environment_variable(variable_name):
@@ -90,166 +93,192 @@ if __name__ == "__main__":
     )
     st.title("Chat with Couchbase Docs")
 
-    load_dotenv()
-    # Load environment variables
-    DB_CONN_STR = os.getenv("DB_CONN_STR")
-    DB_USERNAME = os.getenv("DB_USERNAME")
-    DB_PASSWORD = os.getenv("DB_PASSWORD")
-    DB_BUCKET = os.getenv("DB_BUCKET")
-    DB_SCOPE = os.getenv("DB_SCOPE")
-    DB_COLLECTION = os.getenv("DB_COLLECTION")
-    INDEX_NAME = os.getenv("INDEX_NAME")
-    EMBEDDING_MODEL = "text-embedding-3-small"
+    # Check auth
+    AUTH_ENABLED = parse_bool(os.getenv("AUTH_ENABLED", "False"))
 
-    # Ensure that all environment variables are set
-    check_environment_variable("OPENAI_API_KEY")
-    check_environment_variable("DB_CONN_STR")
-    check_environment_variable("DB_USERNAME")
-    check_environment_variable("DB_PASSWORD")
-    check_environment_variable("DB_BUCKET")
-    check_environment_variable("DB_SCOPE")
-    check_environment_variable("DB_COLLECTION")
-    check_environment_variable("INDEX_NAME")
+    if not AUTH_ENABLED:
+        st.session_state.auth = True
+    else:
+        # Authorization
+        if "auth" not in st.session_state:
+            st.session_state.auth = False
 
-    # Setup Langsmith Client
-    client = Client()
+        AUTH = os.getenv("LOGIN_PASSWORD")
+        check_environment_variable("LOGIN_PASSWORD")
 
-    cluster = connect_to_couchbase(DB_CONN_STR, DB_USERNAME, DB_PASSWORD)
+        # Authentication
+        user_pwd = st.text_input("Enter password", type="password")
+        pwd_submit = st.button("Submit")
 
-    # Fetch ingested document store
-    embeddings = OpenAIEmbeddings(model=EMBEDDING_MODEL)
+        if pwd_submit and user_pwd == AUTH:
+            st.session_state.auth = True
+        elif pwd_submit and user_pwd != AUTH:
+            st.error("Incorrect password")
 
-    # Get the vector store
-    vector_store = get_vector_store(
-        cluster,
-        DB_BUCKET,
-        DB_SCOPE,
-        DB_COLLECTION,
-        embeddings,
-        INDEX_NAME,
-    )
+    if st.session_state.auth:
+        # Load environment variables
+        DB_CONN_STR = os.getenv("DB_CONN_STR")
+        DB_USERNAME = os.getenv("DB_USERNAME")
+        DB_PASSWORD = os.getenv("DB_PASSWORD")
+        DB_BUCKET = os.getenv("DB_BUCKET")
+        DB_SCOPE = os.getenv("DB_SCOPE")
+        DB_COLLECTION = os.getenv("DB_COLLECTION")
+        INDEX_NAME = os.getenv("INDEX_NAME")
+        EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 
-    # Fetch documents from the vector store
-    retriever = vector_store.as_retriever()
+        # Ensure that all environment variables are set
+        check_environment_variable("OPENAI_API_KEY")
+        check_environment_variable("DB_CONN_STR")
+        check_environment_variable("DB_USERNAME")
+        check_environment_variable("DB_PASSWORD")
+        check_environment_variable("DB_BUCKET")
+        check_environment_variable("DB_SCOPE")
+        check_environment_variable("DB_COLLECTION")
+        check_environment_variable("INDEX_NAME")
+        check_environment_variable("LANGCHAIN_ENDPOINT")
+        check_environment_variable("LANGCHAIN_API_KEY")
 
-    # Prompt for answering questions with message history
-    question_answering_prompt = ChatPromptTemplate.from_messages(
-        [
+        # Setup Langsmith Client
+        os.environ.setdefault("LANGCHAIN_TRACING_V2", True)
+        client = Client()
+
+        cluster = connect_to_couchbase(DB_CONN_STR, DB_USERNAME, DB_PASSWORD)
+
+        # Fetch ingested document store
+        embeddings = OpenAIEmbeddings(model=EMBEDDING_MODEL)
+
+        # Get the vector store
+        vector_store = get_vector_store(
+            cluster,
+            DB_BUCKET,
+            DB_SCOPE,
+            DB_COLLECTION,
+            embeddings,
+            INDEX_NAME,
+        )
+
+        # Fetch documents from the vector store
+        retriever = vector_store.as_retriever()
+
+        # Prompt for answering questions with message history
+        question_answering_prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    """You are a chatbot that can answer questions related to Couchbase. Remember that you can only reply to questions related to Couchbase or Couchbase SDKs and follow this strictly. If the user question is not related to couchbase, simply return "I am sorry, I am afraid I can't answer that". 
+                    If you cannot answer based on the context provided, respond with a generic answer.
+                    Answer the question as truthfully as possible using the context below:
+                    {context}""",
+                ),
+                MessagesPlaceholder(variable_name="messages"),
+            ]
+        )
+
+        # Read the chat history for added context
+        ephemeral_chat_history = get_chat_history()
+
+        # Use OpenAI GPT 4 as the LLM for the RAG
+        llm = ChatOpenAI(temperature=0, model="gpt-4-1106-preview")
+
+        # Handle messages for the UI
+        if "messages" not in st.session_state:
+            st.session_state.messages = []
+            st.session_state.messages.append(
+                {
+                    "role": "assistant",
+                    "content": "Hi, I'm a chatbot who can chat with the Couchbase Docs. How can I help you?",
+                }
+            )
+
+        # Prompt to transform the message history into a single query with all details
+        query_transform_prompt = ChatPromptTemplate.from_messages(
+            [
+                MessagesPlaceholder(variable_name="messages"),
+                (
+                    "user",
+                    "Given the above conversation, generate a search query to look up in order to get information relevant to the conversation. Only respond with the query, nothing else.",
+                ),
+            ]
+        )
+
+        # Chain to transform the input message history into a single query using LLM and pass to retriever
+        query_transforming_retriever_chain = RunnableBranch(
             (
-                "system",
-                """You are a chatbot that can answer questions related to Couchbase. Remember that you can only reply to questions related to Couchbase or Couchbase SDKs and follow this strictly. If the user question is not related to couchbase, simply return "I am sorry, I am afraid I can't answer that". 
-                If you cannot answer based on the context provided, respond with a generic answer.
-                Answer the question as truthfully as possible using the context below:
-                {context}""",
+                lambda x: len(x.get("messages", [])) == 1,
+                # If only one message, then we just pass that message's content to retriever
+                (lambda x: x["messages"][-1].content) | retriever,
             ),
-            MessagesPlaceholder(variable_name="messages"),
-        ]
-    )
+            # If messages, then we pass inputs to LLM chain to transform the query, then pass to retriever
+            query_transform_prompt | llm | StrOutputParser() | retriever,
+        ).with_config(run_name="chat_retriever_chain")
 
-    # Read the chat history for added context
-    ephemeral_chat_history = get_chat_history()
+        # Display chat messages from history on app rerun
+        for message in st.session_state.messages:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
 
-    # Use OpenAI GPT 4 as the LLM for the RAG
-    llm = ChatOpenAI(temperature=0, model="gpt-4-1106-preview")
+        # Create a chain to insert relevant documents into prompt to LLM
+        document_chain = create_stuff_documents_chain(llm, question_answering_prompt)
 
-    # Handle messages for the UI
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
-        st.session_state.messages.append(
-            {
-                "role": "assistant",
-                "content": "Hi, I'm a chatbot who can chat with the Couchbase Docs. How can I help you?",
-            }
+        # Conversation chain with added context based on chat history
+        conversational_retrieval_chain = RunnablePassthrough.assign(
+            context=query_transforming_retriever_chain,
+        ).assign(
+            answer=document_chain,
         )
 
-    # Prompt to transform the message history into a single query with all details
-    query_transform_prompt = ChatPromptTemplate.from_messages(
-        [
-            MessagesPlaceholder(variable_name="messages"),
-            (
-                "user",
-                "Given the above conversation, generate a search query to look up in order to get information relevant to the conversation. Only respond with the query, nothing else.",
-            ),
-        ]
-    )
+        clear_cache = st.button("Clear Chat Context")
+        if clear_cache:
+            st.cache_resource.clear()
+            st.rerun()
 
-    # Chain to transform the input message history into a single query using LLM and pass to retriever
-    query_transforming_retriever_chain = RunnableBranch(
-        (
-            lambda x: len(x.get("messages", [])) == 1,
-            # If only one message, then we just pass that message's content to retriever
-            (lambda x: x["messages"][-1].content) | retriever,
-        ),
-        # If messages, then we pass inputs to LLM chain to transform the query, then pass to retriever
-        query_transform_prompt | llm | StrOutputParser() | retriever,
-    ).with_config(run_name="chat_retriever_chain")
+        # React to user input
+        if question := st.chat_input("Questions related to Couchbase?"):
+            # Display user message in chat message container
+            st.chat_message("user").markdown(question)
 
-    # Display chat messages from history on app rerun
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+            # Add user message to chat context
+            ephemeral_chat_history.add_user_message(question)
 
-    # Create a chain to insert relevant documents into prompt to LLM
-    document_chain = create_stuff_documents_chain(llm, question_answering_prompt)
+            # Add user message to chat history
+            st.session_state.messages.append({"role": "user", "content": question})
 
-    # Conversation chain with added context based on chat history
-    conversational_retrieval_chain = RunnablePassthrough.assign(
-        context=query_transforming_retriever_chain,
-    ).assign(
-        answer=document_chain,
-    )
+            # Add placeholder for streaming the response
+            with st.chat_message("assistant"):
+                message_placeholder = st.empty()
+                sources_placeholder = st.empty()
 
-    clear_cache = st.button("Clear Chat Context")
-    if clear_cache:
-        st.cache_resource.clear()
-        st.rerun()
+            full_response = {}
 
-    # React to user input
-    if question := st.chat_input("Questions related to Couchbase?"):
-        # Display user message in chat message container
-        st.chat_message("user").markdown(question)
+            # Stream the response from the RAG
+            for chunk in conversational_retrieval_chain.stream(
+                {"messages": ephemeral_chat_history.messages}
+            ):
+                for key in chunk.keys():
+                    try:
+                        full_response[key] += chunk[key]
+                    except KeyError:
+                        full_response[key] = chunk[key]
 
-        # Add user message to chat context
-        ephemeral_chat_history.add_user_message(question)
+                if "answer" in full_response:
+                    message_placeholder.markdown(full_response["answer"] + "▌")
 
-        # Add user message to chat history
-        st.session_state.messages.append({"role": "user", "content": question})
+            # Add source links to the chat window from the context
+            source_links = set()
+            source_link_string = ""
+            for docs in full_response["context"]:
+                source_links.add(docs.metadata["source"])
+                source_link_string = "\n".join(list(source_links))
 
-        # Add placeholder for streaming the response
-        with st.chat_message("assistant"):
-            message_placeholder = st.empty()
-            sources_placeholder = st.empty()
+            sources_placeholder.markdown(f"Sources: {source_link_string}")
 
-        full_response = {}
+            # Add complete response to the chat window & message history
+            message_placeholder.markdown(full_response["answer"])
+            ephemeral_chat_history.add_ai_message(full_response["answer"])
 
-        # Stream the response from the RAG
-        for chunk in conversational_retrieval_chain.stream(
-            {"messages": ephemeral_chat_history.messages}
-        ):
-            for key in chunk.keys():
-                try:
-                    full_response[key] += chunk[key]
-                except KeyError:
-                    full_response[key] = chunk[key]
-
-            if "answer" in full_response:
-                message_placeholder.markdown(full_response["answer"] + "▌")
-
-        # Add source links to the chat window from the context
-        source_links = []
-        for docs in full_response["context"]:
-            source_links.append(docs.metadata["source"])
-            source_link_string = "\n".join(source_links)
-
-        sources_placeholder.markdown(f"Sources: {source_link_string}")
-
-        # Add complete response to the chat window & message history
-        message_placeholder.markdown(full_response["answer"])
-        ephemeral_chat_history.add_ai_message(full_response["answer"])
-
-        st.session_state.messages.append(
-            {"role": "assistant", "content": full_response["answer"]},
-        )
-        st.session_state.messages.append(
-            {"role": "assistant", "content": "Sources: " + source_link_string},
-        )
+            st.session_state.messages.append(
+                {"role": "assistant", "content": full_response["answer"]},
+            )
+            st.session_state.messages.append(
+                {"role": "assistant", "content": "Sources: " + source_link_string},
+            )

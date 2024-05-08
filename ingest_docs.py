@@ -18,7 +18,6 @@ load_dotenv()
 URL_LIST = "file_with_urls.json"
 METADATA = "metadata.json"
 OUT_FOLDER = "docs"
-EMBEDDING_MODEL = "text-embedding-3-small"
 
 # Load environment variables
 DB_CONN_STR = os.getenv("DB_CONN_STR")
@@ -28,6 +27,7 @@ DB_BUCKET = os.getenv("DB_BUCKET")
 DB_SCOPE = os.getenv("DB_SCOPE")
 DB_COLLECTION = os.getenv("DB_COLLECTION")
 INDEX_NAME = os.getenv("INDEX_NAME")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 
 
 def read_url_list(file_with_urls: str) -> list:
