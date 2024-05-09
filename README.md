@@ -2,6 +2,8 @@
 
 This is a demo Q&A ChatBot built to chat with documentation websites using the Vector Search capabilities of Couchbase to augment the OpenAI results in a Retrieval-Augmented-Generation (RAG) model. It uses [LangChain](https://python.langchain.com/docs/use_cases/question_answering/) to orchestrate the entire workflow.
 
+> Note that you need Couchbase Server 7.6 or higher for Vector Search.
+
 ### How does it work?
 
 You can ask questions about the documentation that has been indexed into the Vector Store. You will get answers from the documentation along with some additional sources to get more information from the documentation website.
@@ -22,21 +24,24 @@ Note that currently the chat history is not linked to any user. Hence, when mult
 
 - #### Set the environment secrets
 
-  Copy the `.env.example` file and rename it to `.env` and replace the placeholders with the actual values for your environment
+  Copy the secrets.example.toml file and rename it to secrets.toml and replace the placeholders with the actual values for your environment.
+
+  > For the ingestion of documentation, the same environment variables need to be set in the environment (using `.env` file from `.env.example`) as it runs outside the Streamlit environment.
 
   ```
-  OPENAI_API_KEY="<open_ai_api_key>"
-  DB_CONN_STR="<connection_string_for_couchbase_cluster>"
-  DB_USERNAME="<username_for_couchbase_cluster>"
-  DB_PASSWORD="<password_for_couchbase_cluster>"
-  DB_BUCKET="<name_of_bucket_to_store_documents>"
-  DB_SCOPE="<name_of_scope_to_store_documents>"
-  DB_COLLECTION="<name_of_collection_to_store_documents>"
-  INDEX_NAME="<name_of_fts_index_with_vector_support>"
-  LOGIN_PASSWORD="<password to access the streamlit app>"
-  LANGCHAIN_TRACING_V2=true
-  LANGCHAIN_ENDPOINT="https://api.smith.langchain.com"
-  LANGCHAIN_API_KEY="<api_key_for_langsmith>"
+  OPENAI_API_KEY = "<open_ai_api_key>"
+  DB_CONN_STR = "<connection_string_for_couchbase_cluster>"
+  DB_USERNAME = "<username_for_couchbase_cluster>"
+  DB_PASSWORD = "<password_for_couchbase_cluster>"
+  DB_BUCKET = "<name_of_bucket_to_store_documents>"
+  DB_SCOPE = "<name_of_scope_to_store_documents>"
+  DB_COLLECTION = "<name_of_collection_to_store_documents>"
+  INDEX_NAME = "<name_of_fts_index_with_vector_support>"
+  EMBEDDING_MODEL = "text-embedding-3-small" # OpenAI embedding model to use to encode the documents
+  LANGCHAIN_ENDPOINT = "https://api.smith.langchain.com"
+  LANGCHAIN_API_KEY = "<api_key_for_langsmith>"
+  AUTH_ENABLED = "True/False" # enables authentication for the streamlit app using LOGIN_PASSWORD
+  LOGIN_PASSWORD = "<password to access the streamlit app>"
   ```
 
 - #### Create a List of URLs to Index into Vector Store
