@@ -3,7 +3,7 @@ couchbase==4.2.1
 langchain==0.2.6
 langchain-community==0.2.6
 langchain-openai==0.1.14
-langsmith==0.1.83
+langsmith==0.1.84
 python-dotenv==1.0.1
 streamlit==1.36.0
 tqdm==4.66.4
