@@ -7,7 +7,7 @@ from langchain_openai import OpenAIEmbeddings
 from langchain.text_splitter import (
     RecursiveCharacterTextSplitter,
 )
-from langchain_community.vectorstores.couchbase import CouchbaseVectorStore
+from langchain_couchbase.vectorstores import CouchbaseVectorStore
 from couchbase.cluster import Cluster
 from couchbase.auth import PasswordAuthenticator
 from couchbase.options import ClusterOptions

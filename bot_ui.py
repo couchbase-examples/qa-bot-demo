@@ -6,7 +6,7 @@ from couchbase.options import ClusterOptions
 from datetime import timedelta
 
 
-from langchain_community.vectorstores.couchbase import CouchbaseVectorStore
+from langchain_couchbase.vectorstores import CouchbaseVectorStore
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import (
@@ -178,7 +178,7 @@ if __name__ == "__main__":
         ephemeral_chat_history = get_chat_history()
 
         # Use OpenAI GPT 4 as the LLM for the RAG
-        llm = ChatOpenAI(temperature=0, model="gpt-4-1106-preview")
+        llm = ChatOpenAI(temperature=0, model="gpt-4o")
 
         # Handle messages for the UI
         if "messages" not in st.session_state:
