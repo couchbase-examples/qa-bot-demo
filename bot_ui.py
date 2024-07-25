@@ -1,5 +1,5 @@
 from typing import Dict
-from langsmith import Client
+
 from couchbase.cluster import Cluster
 from couchbase.auth import PasswordAuthenticator
 from couchbase.options import ClusterOptions
@@ -14,8 +14,9 @@ from langchain_core.runnables import (
     RunnableBranch,
 )
 from langchain_core.output_parsers import StrOutputParser
-from langchain.memory import ChatMessageHistory
+from langchain_couchbase.chat_message_histories import CouchbaseChatMessageHistory
 from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain_core.messages import AIMessage, HumanMessage
 
 import streamlit as st
 import os
@@ -80,10 +81,16 @@ def parse_retriever_input(params: Dict):
 
 
 @st.cache_resource()
-def get_chat_history():
-    """Store the chat history in an ephemeral storage"""
-    ephemeral_chat_history = ChatMessageHistory()
-    return ephemeral_chat_history
+def get_chat_history(_cluster, db_bucket, db_scope, db_collection):
+    """Store the chat history in an Couchbase"""
+    chat_message_history = CouchbaseChatMessageHistory(
+        cluster=_cluster,
+        bucket_name=db_bucket,
+        scope_name=db_scope,
+        collection_name=db_collection,
+        session_id="chat-session",
+    )
+    return chat_message_history
 
 
 if __name__ == "__main__":
@@ -125,6 +132,7 @@ if __name__ == "__main__":
         DB_COLLECTION = os.getenv("DB_COLLECTION")
         INDEX_NAME = os.getenv("INDEX_NAME")
         EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
+        CONVERSATIONAL_CACHE_COLLECTION = os.getenv("CONVERSATIONAL_CACHE_COLLECTION")
 
         # Ensure that all environment variables are set
         check_environment_variable("OPENAI_API_KEY")
@@ -134,13 +142,13 @@ if __name__ == "__main__":
         check_environment_variable("DB_BUCKET")
         check_environment_variable("DB_SCOPE")
         check_environment_variable("DB_COLLECTION")
+        check_environment_variable("CONVERSATIONAL_CACHE_COLLECTION")
         check_environment_variable("INDEX_NAME")
         check_environment_variable("LANGCHAIN_ENDPOINT")
         check_environment_variable("LANGCHAIN_API_KEY")
 
         # Setup Langsmith Client
-        os.environ.setdefault("LANGCHAIN_TRACING_V2", "True")
-        client = Client()
+        os.environ.setdefault("LANGCHAIN_TRACING_V2", "true")
 
         cluster = connect_to_couchbase(DB_CONN_STR, DB_USERNAME, DB_PASSWORD)
 
@@ -175,14 +183,20 @@ if __name__ == "__main__":
         )
 
         # Read the chat history for added context
-        ephemeral_chat_history = get_chat_history()
+        chat_history = get_chat_history(
+            _cluster=cluster,
+            db_bucket=DB_BUCKET,
+            db_scope=DB_SCOPE,
+            db_collection=CONVERSATIONAL_CACHE_COLLECTION,
+        )
 
         # Use OpenAI GPT 4 as the LLM for the RAG
         llm = ChatOpenAI(temperature=0, model="gpt-4o")
 
+        st.session_state.messages = chat_history.messages
+
         # Handle messages for the UI
-        if "messages" not in st.session_state:
-            st.session_state.messages = []
+        if len(st.session_state.messages) == 0:
             st.session_state.messages.append(
                 {
                     "role": "assistant",
@@ -214,8 +228,15 @@ if __name__ == "__main__":
 
         # Display chat messages from history on app rerun
         for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.markdown(message["content"])
+            if isinstance(message, AIMessage):
+                with st.chat_message("assistant"):
+                    st.markdown(message.content)
+            elif isinstance(message, HumanMessage):
+                with st.chat_message("user"):
+                    st.markdown(message.content)
+            else:
+                with st.chat_message(message["role"]):
+                    st.markdown(message["content"])
 
         # Create a chain to insert relevant documents into prompt to LLM
         document_chain = create_stuff_documents_chain(llm, question_answering_prompt)
@@ -229,7 +250,8 @@ if __name__ == "__main__":
 
         clear_cache = st.button("Clear Chat Context")
         if clear_cache:
-            st.cache_resource.clear()
+            chat_history.clear()
+            st.session_state.messages = []
             st.rerun()
 
         # React to user input
@@ -238,10 +260,7 @@ if __name__ == "__main__":
             st.chat_message("user").markdown(question)
 
             # Add user message to chat context
-            ephemeral_chat_history.add_user_message(question)
-
-            # Add user message to chat history
-            st.session_state.messages.append({"role": "user", "content": question})
+            chat_history.add_user_message(question)
 
             # Add placeholder for streaming the response
             with st.chat_message("assistant"):
@@ -252,7 +271,7 @@ if __name__ == "__main__":
 
             # Stream the response from the RAG
             for chunk in conversational_retrieval_chain.stream(
-                {"messages": ephemeral_chat_history.messages}
+                {"messages": chat_history.messages}
             ):
                 for key in chunk.keys():
                     try:
@@ -274,11 +293,5 @@ if __name__ == "__main__":
 
             # Add complete response to the chat window & message history
             message_placeholder.markdown(full_response["answer"])
-            ephemeral_chat_history.add_ai_message(full_response["answer"])
-
-            st.session_state.messages.append(
-                {"role": "assistant", "content": full_response["answer"]},
-            )
-            st.session_state.messages.append(
-                {"role": "assistant", "content": "Sources: " + source_link_string},
-            )
+            chat_history.add_ai_message(full_response["answer"])
+            chat_history.add_ai_message("Sources: " + source_link_string)
