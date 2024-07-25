@@ -10,7 +10,7 @@ You can ask questions about the documentation that has been indexed into the Vec
 
 ![Bot in action](bot.png)
 
-You can also ask follow up questions. The chat bot will summarize the previous chat history to find relevant answers.
+You can also ask follow up questions. The chat bot will summarize the previous chat history stored in Couchbase to find relevant answers. The chat message history is saved in the specified collection in the same scope and bucket.
 
 We are using Streamlit, LangChain, Couchbase Vector Search & OpenAI along with [LangSmith](https://docs.smith.langchain.com/) for observability into the bot.
 
@@ -36,6 +36,7 @@ Note that currently the chat history is not linked to any user. Hence, when mult
   DB_BUCKET = "<name_of_bucket_to_store_documents>"
   DB_SCOPE = "<name_of_scope_to_store_documents>"
   DB_COLLECTION = "<name_of_collection_to_store_documents>"
+  CONVERSATIONAL_CACHE_COLLECTION = "<name_of_collection_to_store_conversations>"
   INDEX_NAME = "<name_of_fts_index_with_vector_support>"
   EMBEDDING_MODEL = "text-embedding-3-small" # OpenAI embedding model to use to encode the documents
   LANGCHAIN_ENDPOINT = "https://api.smith.langchain.com"
