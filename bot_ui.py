@@ -38,7 +38,7 @@ def check_environment_variable(variable_name):
 
 @st.cache_resource(show_spinner="Connecting to Couchbase")
 def connect_to_couchbase(connection_string, db_username, db_password):
-    """Connect to couchbase"""
+    """Connect to Couchbase cluster"""
 
     auth = PasswordAuthenticator(db_username, db_password)
     options = ClusterOptions(auth)
@@ -82,7 +82,7 @@ def parse_retriever_input(params: Dict):
 
 @st.cache_resource()
 def get_chat_history(_cluster, db_bucket, db_scope, db_collection):
-    """Store the chat history in an Couchbase"""
+    """Store the chat history in Couchbase"""
     chat_message_history = CouchbaseChatMessageHistory(
         cluster=_cluster,
         bucket_name=db_bucket,
@@ -168,6 +168,14 @@ if __name__ == "__main__":
         # Fetch documents from the vector store
         retriever = vector_store.as_retriever()
 
+        # Chat history store for added context
+        chat_history = get_chat_history(
+            _cluster=cluster,
+            db_bucket=DB_BUCKET,
+            db_scope=DB_SCOPE,
+            db_collection=CONVERSATIONAL_CACHE_COLLECTION,
+        )
+
         # Prompt for answering questions with message history
         question_answering_prompt = ChatPromptTemplate.from_messages(
             [
@@ -182,15 +190,7 @@ if __name__ == "__main__":
             ]
         )
 
-        # Read the chat history for added context
-        chat_history = get_chat_history(
-            _cluster=cluster,
-            db_bucket=DB_BUCKET,
-            db_scope=DB_SCOPE,
-            db_collection=CONVERSATIONAL_CACHE_COLLECTION,
-        )
-
-        # Use OpenAI GPT 4 as the LLM for the RAG
+        # Use OpenAI GPT-4o as the LLM for the RAG
         llm = ChatOpenAI(temperature=0, model="gpt-4o")
 
         st.session_state.messages = chat_history.messages
@@ -205,7 +205,7 @@ if __name__ == "__main__":
             )
 
         # Prompt to transform the message history into a single query with all details
-        query_transform_prompt = ChatPromptTemplate.from_messages(
+        chat_history_summary_prompt = ChatPromptTemplate.from_messages(
             [
                 MessagesPlaceholder(variable_name="messages"),
                 (
@@ -223,7 +223,7 @@ if __name__ == "__main__":
                 (lambda x: x["messages"][-1].content) | retriever,
             ),
             # If messages, then we pass inputs to LLM chain to transform the query, then pass to retriever
-            query_transform_prompt | llm | StrOutputParser() | retriever,
+            chat_history_summary_prompt | llm | StrOutputParser() | retriever,
         ).with_config(run_name="chat_retriever_chain")
 
         # Display chat messages from history on app rerun
@@ -289,9 +289,9 @@ if __name__ == "__main__":
                 source_links.add(docs.metadata["source"])
                 source_link_string = "\n".join(list(source_links))
 
-            sources_placeholder.markdown(f"Sources: {source_link_string}")
+            sources_placeholder.markdown(f"Sources:\n{source_link_string}")
 
             # Add complete response to the chat window & message history
             message_placeholder.markdown(full_response["answer"])
             chat_history.add_ai_message(full_response["answer"])
-            chat_history.add_ai_message("Sources: " + source_link_string)
+            chat_history.add_ai_message("Sources: \n" + source_link_string)
