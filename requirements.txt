@@ -5,4 +5,4 @@ langchain-openai==0.2.3
 langsmith==0.1.129
 python-dotenv==1.0.1
 streamlit==1.38.0
-tqdm==4.66.5
+tqdm==4.66.6
