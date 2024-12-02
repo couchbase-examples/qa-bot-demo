@@ -4,5 +4,5 @@ langchain-community==0.3.8
 langchain-openai==0.2.5
 langsmith==0.1.139
 python-dotenv==1.0.1
-streamlit==1.39.0
+streamlit==1.40.2
 tqdm==4.66.6
