@@ -6,7 +6,7 @@ from couchbase.options import ClusterOptions
 from datetime import timedelta
 
 
-from langchain_couchbase.vectorstores import CouchbaseVectorStore
+from langchain_couchbase.vectorstores import CouchbaseSearchVectorStore
 from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.runnables import (
@@ -59,9 +59,9 @@ def get_vector_store(
     db_collection,
     _embedding,
     index_name,
-) -> CouchbaseVectorStore:
+) -> CouchbaseSearchVectorStore:
     """Return the Couchbase vector store"""
-    vector_store = CouchbaseVectorStore(
+    vector_store = CouchbaseSearchVectorStore(
         cluster=_cluster,
         bucket_name=db_bucket,
         scope_name=db_scope,

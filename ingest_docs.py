@@ -7,7 +7,7 @@ from langchain_openai import OpenAIEmbeddings
 from langchain.text_splitter import (
     RecursiveCharacterTextSplitter,
 )
-from langchain_couchbase.vectorstores import CouchbaseVectorStore
+from langchain_couchbase.vectorstores import CouchbaseSearchVectorStore
 from couchbase.cluster import Cluster
 from couchbase.auth import PasswordAuthenticator
 from couchbase.options import ClusterOptions
@@ -77,7 +77,7 @@ cluster = Cluster(connect_string, options)
 cluster.wait_until_ready(timedelta(seconds=5))
 
 # Create the vector store object
-vector_store = CouchbaseVectorStore(
+vector_store = CouchbaseSearchVectorStore(
     embedding=embeddings,
     cluster=cluster,
     bucket_name=DB_BUCKET,
