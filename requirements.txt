@@ -1,7 +1,7 @@
 beautifulsoup4==4.13.4
 langchain-couchbase==0.4.0
 langchain-community==0.3.27
-langchain-openai==0.3.27
+langchain-openai==0.3.28
 langsmith==0.4.4
 python-dotenv==1.1.1
 streamlit==1.45.1
