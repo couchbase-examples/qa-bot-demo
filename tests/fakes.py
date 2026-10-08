@@ -30,6 +30,8 @@ SECRET_NAMES = (
     "LANGSMITH_API_KEY",
     "LOGIN_PASSWORD",
 )
+# Optional in the app; the smoke tests run with these unset.
+LANGSMITH_NAMES = ("LANGCHAIN_ENDPOINT", "LANGCHAIN_API_KEY", "LANGSMITH_API_KEY")
 
 
 class FakeCluster:

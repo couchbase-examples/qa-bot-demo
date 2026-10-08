@@ -15,7 +15,7 @@ python -m playwright install chromium           # add --with-deps on a fresh Lin
 | --- | --- | --- | --- |
 | 1. Streamlit + ingestion smoke | `tests/test_streamlit_smoke.py` boots `bot_ui.py` headlessly. It checks that the title, welcome message, "Clear Chat Context" button and chat input render. It asks a question and a follow-up (which covers both retriever branches), checks for the answer and the "Sources" link, clears the chat, and checks the `AUTH_ENABLED` password gate. `tests/test_ingest_smoke.py` runs `ingest_docs.py` and checks that fetched pages are chunked into the vector store and that an unreachable URL is skipped. Couchbase, OpenAI and web fetching are replaced by in-memory fakes (`tests/fakes.py`, `tests/smoke_app.py`). Every UI test fails on a `stException` element or on `Traceback` in the page or server log. | None | Every PR and push to `main` (`Streamlit + ingestion smoke (no secrets)` job). This is the required check. |
 | 2. OpenAI provider smoke | `tests/test_openai_provider.py` calls the live OpenAI API with the exact models the app uses (read from `bot_ui.py` / `ingest_docs.py`, or `EMBEDDING_MODEL` if set). Embeddings must be 1536 finite floats, matching the Search index, and the chat model must stream a non-empty reply. Couchbase is not used. | `OPENAI_API_KEY` | `OpenAI provider smoke (optional, OPENAI_API_KEY)` job, on PRs from this repo, pushes to `main`, and manual `workflow_dispatch`. If the secret is not available (not configured, fork or Dependabot PRs), the job passes with a "skipped" notice. |
-| 3. Live Couchbase RAG validation | The full app and ingestion against a real cluster, Search vector index, OpenAI and LangSmith. | All app secrets | Manual only (see below). |
+| 3. Live Couchbase RAG validation | The full app and ingestion against a real cluster, Search vector index and OpenAI. LangSmith is optional. | `OPENAI_API_KEY` and the Couchbase settings | Manual only (see below). |
 
 Commands:
 
@@ -40,8 +40,9 @@ Names only. Never commit values. `.streamlit/secrets.toml`, `.env` and
 - `DB_CONN_STR`, `DB_USERNAME`, `DB_PASSWORD`, `DB_BUCKET`, `DB_SCOPE`,
   `DB_COLLECTION`, `CONVERSATIONAL_CACHE_COLLECTION`, `INDEX_NAME`,
   `EMBEDDING_MODEL`: Couchbase and model settings, tier 3 only. They are not in CI.
-- `LANGCHAIN_ENDPOINT`, `LANGCHAIN_API_KEY`: LangSmith tracing, tier 3 only.
-  The app refuses to start without them.
+- `LANGCHAIN_ENDPOINT`, `LANGCHAIN_API_KEY`: optional LangSmith tracing. The app
+  turns tracing on only when `LANGCHAIN_API_KEY` is set, and runs without it.
+  No test tier needs them, and LangSmith is not required for validation right now.
 - `AUTH_ENABLED`, `LOGIN_PASSWORD`: optional password gate for the UI.
 
 ## Manual live validation for dependency-update PRs
@@ -53,7 +54,7 @@ manual validation against real services before merge, with evidence on the PR:
 
 1. **Dependency install**: `pip install -r requirements.txt` on the PR branch succeeds. Include the resolved versions of the bumped packages.
 2. **Provider credentials**: name the secrets that were set (`OPENAI_API_KEY`,
-   `LANGCHAIN_API_KEY`, ...), never their values. Tier 2 passes, or explain why it was skipped.
+   `DB_PASSWORD`, ...), never their values. Tier 2 passes, or explain why it was skipped.
 3. **Couchbase connection and index state**: the cluster at `DB_CONN_STR` is
    reachable. The `DB_BUCKET`/`DB_SCOPE`/`DB_COLLECTION` and
    `CONVERSATIONAL_CACHE_COLLECTION` exist. The Search index `INDEX_NAME` exists,

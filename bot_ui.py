@@ -144,11 +144,11 @@ if __name__ == "__main__":
         check_environment_variable("DB_COLLECTION")
         check_environment_variable("CONVERSATIONAL_CACHE_COLLECTION")
         check_environment_variable("INDEX_NAME")
-        check_environment_variable("LANGCHAIN_ENDPOINT")
-        check_environment_variable("LANGCHAIN_API_KEY")
-
-        # Setup Langsmith Client
-        os.environ.setdefault("LANGCHAIN_TRACING_V2", "true")
+        # LangSmith tracing is optional: enable it only when an API key is set
+        if os.getenv("LANGCHAIN_API_KEY"):
+            os.environ.setdefault("LANGCHAIN_TRACING_V2", "true")
+        else:
+            os.environ["LANGCHAIN_TRACING_V2"] = "false"
 
         cluster = connect_to_couchbase(DB_CONN_STR, DB_USERNAME, DB_PASSWORD)
 

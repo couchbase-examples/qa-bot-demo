@@ -1,7 +1,8 @@
 """Run bot_ui.py with Couchbase and OpenAI swapped for in-memory fakes.
 
 Streamlit executes this file instead of the app so the UI can be smoke tested
-without a Couchbase cluster, an OPENAI_API_KEY or a LangSmith key.
+without a Couchbase cluster, an OPENAI_API_KEY or a LangSmith key. The
+LangSmith variables are left unset, which checks that the app runs without them.
 """
 
 import os
@@ -19,10 +20,8 @@ APP = Path(__file__).resolve().parent.parent / "bot_ui.py"
 
 # Placeholders only, so the app's environment checks pass.
 for name in fakes.SECRET_NAMES:
-    os.environ[name] = "smoke-placeholder"
-# The app turns LangSmith tracing on by default; keep it off.
-os.environ["LANGCHAIN_TRACING_V2"] = "false"
-os.environ["LANGSMITH_TRACING"] = "false"
+    if name not in fakes.LANGSMITH_NAMES:
+        os.environ[name] = "smoke-placeholder"
 
 fakes.install()
 langchain_couchbase.vectorstores.CouchbaseSearchVectorStore = fakes.seeded_vector_store
