@@ -1,0 +1,64 @@
+name: Smoke tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  streamlit-smoke:
+    name: Streamlit + ingestion smoke (no secrets)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements-dev.txt
+          python -m playwright install --with-deps chromium
+      - name: Run Streamlit + Playwright and ingestion smoke tests
+        run: python -m pytest tests/test_streamlit_smoke.py tests/test_ingest_smoke.py -v
+
+  openai-provider-smoke:
+    name: OpenAI provider smoke (optional, OPENAI_API_KEY)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - name: Check for OPENAI_API_KEY
+        id: key
+        run: |
+          if [ -n "$OPENAI_API_KEY" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=OpenAI provider smoke skipped::OPENAI_API_KEY is not available to this run (it is not configured, or this is a fork or Dependabot PR). Run this workflow manually to check the live OpenAI path."
+          fi
+      - if: steps.key.outputs.present == 'true'
+        uses: actions/checkout@v7
+      - if: steps.key.outputs.present == 'true'
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - name: Install dependencies
+        if: steps.key.outputs.present == 'true'
+        run: python -m pip install -r requirements-dev.txt
+      - name: Run live OpenAI provider smoke test
+        if: steps.key.outputs.present == 'true'
+        run: python -m pytest tests/test_openai_provider.py -v -rs
