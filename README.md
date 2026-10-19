@@ -39,8 +39,8 @@ Note that currently the chat history is not linked to any user. Hence, when mult
   CONVERSATIONAL_CACHE_COLLECTION = "<name_of_collection_to_store_conversations>"
   INDEX_NAME = "<name_of_fts_index_with_vector_support>"
   EMBEDDING_MODEL = "text-embedding-3-small" # OpenAI embedding model to use to encode the documents
-  LANGCHAIN_ENDPOINT = "https://api.smith.langchain.com"
-  LANGCHAIN_API_KEY = "<api_key_for_langsmith>"
+  LANGCHAIN_ENDPOINT = "https://api.smith.langchain.com" # optional, LangSmith tracing
+  LANGCHAIN_API_KEY = "<api_key_for_langsmith>" # optional, tracing is enabled only when this is set
   AUTH_ENABLED = "True/False" # enables authentication for the streamlit app using LOGIN_PASSWORD
   LOGIN_PASSWORD = "<password to access the streamlit app>"
   ```
@@ -174,3 +174,7 @@ Note that currently the chat history is not linked to any user. Hence, when mult
 - #### Run the Application
 
   `streamlit run bot_ui.py`
+
+### Testing
+
+See [AGENTS.md](AGENTS.md) for the smoke tests (a no-secret Streamlit + Playwright and ingestion check, and an optional live OpenAI check that uses `OPENAI_API_KEY`) and the manual live-validation checklist for dependency updates.
