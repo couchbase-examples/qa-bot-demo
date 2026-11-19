@@ -11,7 +11,9 @@ import langchain_openai
 from langchain_core.chat_history import BaseChatMessageHistory
 from langchain_core.documents import Document
 from langchain_core.embeddings import DeterministicFakeEmbedding
-from langchain_core.language_models import FakeListChatModel
+from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.vectorstores import InMemoryVectorStore
 
 SOURCE_URL = "https://docs.couchbase.com/smoke-test.html"
@@ -43,20 +45,49 @@ class FakeCluster:
 
 
 class FakeChatMessageHistory(BaseChatMessageHistory):
-    """Like CouchbaseChatMessageHistory, `messages` returns a fresh list."""
+    """Like CouchbaseChatMessageHistory, `messages` returns a fresh list.
+
+    The real class reads with SQL++ at the default `not_bounded` scan
+    consistency, so a message written a moment ago is usually missing from the
+    next read. To model that deterministically, a write stays invisible until
+    the next Streamlit script run (smoke_app.py calls `start_run()`).
+    """
+
+    _run = 0
+
+    @classmethod
+    def start_run(cls):
+        cls._run += 1
 
     def __init__(self, session_id, **kwargs):
-        self._messages = []
+        self._messages = []  # (run the write happened in, message)
 
     @property
     def messages(self):
-        return list(self._messages)
+        return [m for run, m in self._messages if run < self._run]
 
     def add_message(self, message):
-        self._messages.append(message)
+        self._messages.append((self._run, message))
 
     def clear(self):
         self._messages = []
+
+
+class EchoChatModel(BaseChatModel):
+    """Answers with the last human message it was given, so the UI test can
+    check that each answer is for the question that was just asked."""
+
+    model: str
+
+    @property
+    def _llm_type(self):
+        return "echo"
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        questions = [m.content for m in messages if isinstance(m, HumanMessage)]
+        question = questions[-1] if questions else "(no question)"
+        reply = f"Smoke answer from {self.model} to: {question}"
+        return ChatResult(generations=[ChatGeneration(message=AIMessage(reply))])
 
 
 class FakeVectorStore(InMemoryVectorStore):
@@ -75,7 +106,7 @@ def fake_embeddings(model, **kwargs):
 
 
 def fake_chat_model(model, **kwargs):
-    return FakeListChatModel(responses=[f"Smoke answer from {model}"])
+    return EchoChatModel(model=model)
 
 
 def install(setattr=setattr):

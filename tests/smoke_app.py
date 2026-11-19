@@ -24,6 +24,7 @@ for name in fakes.SECRET_NAMES:
         os.environ[name] = "smoke-placeholder"
 
 fakes.install()
+fakes.FakeChatMessageHistory.start_run()
 langchain_couchbase.vectorstores.CouchbaseSearchVectorStore = fakes.seeded_vector_store
 
 runpy.run_path(str(APP), run_name="__main__")
