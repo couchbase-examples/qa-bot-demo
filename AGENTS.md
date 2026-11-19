@@ -71,13 +71,20 @@ manual validation against real services before merge, with evidence on the PR:
 If a live service is unavailable, write down the exact blocker on the PR. Do not
 approve it based on the smoke tests alone.
 
-### Known issue: answers lag one question behind
+### Chat history is read at `not_bounded` consistency
 
-`CouchbaseChatMessageHistory` (langchain-couchbase 1.0.0 to 1.1.1) reads and
+`CouchbaseChatMessageHistory` (langchain-couchbase 1.0.0 to 1.2.0) reads and
 clears the chat history with SQL++ at the default `not_bounded` scan
 consistency. Right after `add_user_message`, `chat_history.messages` usually
-doesn't include the new question yet, so the RAG chain answers the previous
-question (or none). The first answer after a clear is often "I am sorry, I am
-afraid I can't answer that". This happens on `main` too; it is not caused by a
-dependency bump. When you validate, compare against `main` and check whether
-each answer matches its own question or the one before.
+doesn't include the new question yet. So `bot_ui.py` never re-reads the history
+inside a turn. `conversation_for_turn()` builds the chain input from the history
+read at the start of the run, plus the new question. Keep it that way: if the
+chain is fed `chat_history.messages` straight after a write, it answers the
+previous question (or none, which gives "I am sorry, I am afraid I can't
+answer that").
+
+The smoke-test fake (`tests/fakes.py`) models this lag. A history write stays
+invisible until the next Streamlit run, and the fake chat model echoes the
+question it was given. `test_chat_round_trip` then checks that each answer is
+for its own question. When you validate live, check that each answer matches
+its own question.

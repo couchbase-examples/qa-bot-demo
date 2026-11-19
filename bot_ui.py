@@ -16,7 +16,7 @@ from langchain_core.runnables import (
 from langchain_core.output_parsers import StrOutputParser
 from langchain_couchbase.chat_message_histories import CouchbaseChatMessageHistory
 from langchain_classic.chains.combine_documents import create_stuff_documents_chain
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 
 import streamlit as st
 import os
@@ -78,6 +78,20 @@ def format_docs(docs):
 
 def parse_retriever_input(params: Dict):
     return params["messages"][-1].content
+
+
+def conversation_for_turn(history, question):
+    """Return the messages to send to the RAG chain for a new question.
+
+    `history` is the chat history read at the start of this run. Build the turn
+    from it instead of re-reading Couchbase right after saving the question:
+    CouchbaseChatMessageHistory reads with SQL++ at `not_bounded` scan
+    consistency, so a fresh read usually misses the message just written and
+    the chain would answer the previous question. Non-message entries such as
+    the UI welcome text are dropped.
+    """
+    messages = [m for m in history if isinstance(m, BaseMessage)]
+    return messages + [HumanMessage(content=question)]
 
 
 @st.cache_resource()
@@ -259,8 +273,10 @@ if __name__ == "__main__":
             # Display user message in chat message container
             st.chat_message("user").markdown(question)
 
-            # Add user message to chat context
+            # Add user message to chat context. The chain gets the history this
+            # run already read plus the question; re-reading here would miss it.
             chat_history.add_user_message(question)
+            turn_messages = conversation_for_turn(st.session_state.messages, question)
 
             # Add placeholder for streaming the response
             with st.chat_message("assistant"):
@@ -271,7 +287,7 @@ if __name__ == "__main__":
 
             # Stream the response from the RAG
             for chunk in conversational_retrieval_chain.stream(
-                {"messages": chat_history.messages}
+                {"messages": turn_messages}
             ):
                 for key in chunk.keys():
                     try:

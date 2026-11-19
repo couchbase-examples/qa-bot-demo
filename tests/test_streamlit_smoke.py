@@ -48,7 +48,7 @@ def _ask(page: Page, question):
     chat = page.get_by_placeholder(CHAT_PLACEHOLDER)
     chat.fill(question)
     chat.press("Enter")
-    expect(page.get_by_text(question)).to_be_visible()
+    expect(page.get_by_text(question, exact=True)).to_be_visible()
 
 
 @pytest.fixture(scope="module")
@@ -70,12 +70,15 @@ def test_chat_round_trip(app):
     # First question goes straight to the retriever.
     _ask(page, "What is Couchbase?")
     expect(page.get_by_text(ANSWER)).to_have_count(1)
+    # The answer must be for this question, not the previous one (or none).
+    expect(page.get_by_text(f"{ANSWER} to: What is Couchbase?")).to_have_count(1)
     expect(page.get_by_text(SOURCE_URL)).to_have_count(1)
     _assert_no_errors(page, log_path)
 
     # A follow-up goes through the history-summarising branch first.
     _ask(page, "Tell me more")
     expect(page.get_by_text(ANSWER)).to_have_count(2)
+    expect(page.get_by_text(f"{ANSWER} to: Tell me more")).to_have_count(1)
     _assert_no_errors(page, log_path)
 
 
